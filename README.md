@@ -131,9 +131,9 @@ File Tree For Important Files:
 
 3. Don't change any code in the `autograder` folder.
 
-    The code in the `autograder` folder is used for grading, and we will use the git clone the original code from github to the `autograder` folder for grading. 
+    The code in the `autograder` folder is used for grading, and we will use git to clone the original code from github to the `autograder` folder for grading. 
 
-    If you change any code in the `autograder` folder, ***we can't guarantee*** autograder will work properly. And this may lead to a ZERO grade related to accuracy performance.
+    If you change any code in the `autograder` folder in your local device, ***we can't guarantee*** autograder will work properly. And this may lead to a ZERO grade related to accuracy performance.
 
 
 ## ⭐️ Grading Breakdown
