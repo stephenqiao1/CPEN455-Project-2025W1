@@ -145,8 +145,8 @@ File Tree For Important Files:
 | Bayes Inverse Zero Shot | Produce zero-shot predictions and discuss accuracy | `bash examples/bayes_inverse_zero_shot.sh` | 10% |
 | Bayes Inverse Naive Prompting | Compare prompted vs. zero-shot performance in the report | `bash examples/bayes_inverse_naive_prompting.sh` | 10% |
 | Bayes Inverse Full Finetune | Launch the fine-tuning loop and report results | `bash examples/bayes_inverse_full_finetune.sh` | 10% |
-| Accuracy ≥ 80% | Achieve at least 80% accuracy on the test set | submit to kaggle leaderboard | +5% |
-| Accuracy ≥ 85% | Achieve at least 85% accuracy on the test set | submit to kaggle leaderboard | +5% |
+| Accuracy ≥ 80% | Achieve at least 80% accuracy on the test set | submit to kaggle leaderboard | 5% |
+| Accuracy ≥ 85% | Achieve at least 85% accuracy on the test set | submit to kaggle leaderboard | 5% |
 | KV Cache Explanation | Explain decoder-only models, KV cache usage, drawbacks, and repo implementation | Report section referencing `model/` and `utils/` code | 20% |
 | Leaderboard Competition | Make sure autograder works | All students' performance evaluated and ranked by TAs | Up to 30% |
 
