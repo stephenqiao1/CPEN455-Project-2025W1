@@ -37,8 +37,7 @@ def prep_kaggle_submission(input_csv_path, output_csv_path='kaggle_submission.cs
     # If prob_spam > prob_ham, classify as spam (1), else ham (0)
     spam_predictions = (df['prob_spam'] > df['prob_ham']).astype(int)
     
-    # Map predictions to spam/ham labels
-    submission_df['SPAM/HAM'] = spam_predictions.map({0: 'ham', 1: 'spam'})
+    submission_df['SPAM/HAM'] = spam_predictions
     
     # Display prediction statistics
     print(f"\nPrediction distribution:")
