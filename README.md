@@ -116,6 +116,36 @@ File Tree For Important Files:
 - Exclude large caches when creating the archive (for example: `zip -r cpen455_project.zip . -x 'cache/*' 'wandb/*' '__pycache__/*'`).
 - Run `bash autograder/auto_grader.sh` one last time before zipping so the graders see up-to-date outputs.
 
+### Submitting to Kaggle competition 
+Follow these steps to prepare the Kaggle submission file and submit it using the Kaggle CLI. We provide an `examples/prep_submission_kaggle.py` helper that turns model probability outputs into the required `ID,SPAM/HAM` CSV.
+
+1. Generate probability predictions (writes CSVs into `bayes_inverse_probs/`) if you haven't already:
+
+```bash
+uv run -m examples.save_prob_example
+```
+
+2. Create the Kaggle submission CSV from the generated probabilities (example file path shown):
+
+```bash
+uv run -m examples.prep_submission_kaggle --input bayes_inverse_probs/test_dataset_probs.csv --output kaggle_submission.csv
+```
+
+This runs the `examples/prep_submission_kaggle.py` module using `uv` and will print a quick preview and statistics before writing `kaggle_submission.csv` to the project root (or the path you pass to `--output`).
+
+3. Inspect the created file to ensure formats look correct:
+
+```bash
+head -n 10 kaggle_submission.csv
+```
+
+
+
+Notes:
+- Ensure the submission CSV uses the exact column names and formats required by the competition. Our helper script produces `ID` and `SPAM/HAM` columns as expected.
+- If you need to create a different input path or output filename, pass `--input` and `--output` to the `uv run -m examples.prep_submission_kaggle` command.
+- Upload `kaggle_submission.csv` manually via the competition [website](https://www.kaggle.com/t/7bd983ca8e064c9aa7f13cf1ecbdbf23). Submissions are rate-limited: you may submit up to 10 times per day. The public leaderboard uses 70% of the test data (public split); the final ranking will be calculated on the entire test set and revealed after the submission deadline.
+
 ### ⭐️ Notes on Grading Interface
 
 1. **`examples/save_prob_example.py` is the most important interface used for grading.**
