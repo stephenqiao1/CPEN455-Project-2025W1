@@ -83,15 +83,23 @@ Where:
     - Validate everything end-to-end by executing `bash autograder/auto_grader.sh`; this is the same entry point used during grading.
 
 ### Other Methods to Explore
-If you find that simply utilizing the provided examples does not yield satisfactory results, any methods are welcome. Here are some suggestions if you need inspiration:
 
-**Prefix-Tuning**: Instead of fine-tuning the entire model, you can explore prefix-tuning techniques where only a small set of parameters (prefix tokens) are trained while keeping the rest of the model fixed. This can be more efficient and may lead to better generalization.
+> **Constraints:** ***Directly using*** other powerful LLM to classify emails ***is NOT allowed***. It's not fair to students with very limited computing resources. You must use the provided codebase and make modifications based on provided pre-trained models only.
+> 
+> Using pre-trained models (no matter self-served model or LLM api) to synthesize data for augmentation is allowed.
 
-**LoRA (Low-Rank Adaptation)**: LoRA introduces low-rank matrices to the model's weights, allowing for efficient fine-tuning with fewer parameters.
+If you find that simply utilizing the provided examples does not yield satisfactory results, any methods that meet the constraints are welcome. Here are some suggestions if you need inspiration:
+
+**Prefix-Tuning**: Instead of fine-tuning the entire model, you can explore prefix-tuning techniques where only a small set of parameters (prefix tokens) are trained while keeping the rest of the model fixed. This can be more efficient and may lead to better generalization.(https://arxiv.org/abs/2101.00190)
+
+**LoRA (Low-Rank Adaptation)**: LoRA introduces low-rank matrices to the model's weights, allowing for efficient fine-tuning with fewer parameters.(https://arxiv.org/abs/2106.09685)
 
 **Data Synthesis**: If you find the dataset too small, you can explore data synthesis techniques to generate additional training data via powerful LLMs. Ask them to generate synthetic spam and non-spam emails to augment your training set.
 
-**Ensemble Methods**: Combine predictions from multiple models or different configurations of the same model to improve classification performance.
+**Ensemble Methods**: Combine predictions from multiple models or different configurations of the same model to improve classification performance. For Example:
+
++ [Model weight fusion techniques](https://arxiv.org/abs/2203.05482)
++ [Weighted Product of Experts](https://qihang-zhang.com/Learning-Sys-Blog/2025/10/15/weighted-product-of-experts.html)
 
 ## ⭐️ Submission Instructions
 
@@ -111,7 +119,7 @@ File Tree For Important Files:
 ```
 
 ### Packaging Checklist
-- Keep exactly one best checkpoint in `examples/ckpts/`; remove redundant checkpoints to reduce submission size.
+- Keep only necessary checkpoint in `examples/ckpts/`(If you don't use model ensemble methods or LoRA, only keep one checkpoint); remove redundant checkpoints to reduce submission size.
 - Verify `report.pdf` (NeurIPS style) lives in the repository root and references all experiments you ran.
 - Exclude large caches when creating the archive (for example: `zip -r cpen455_project.zip . -x 'cache/*' 'wandb/*' '__pycache__/*'`).
 - Run `bash autograder/auto_grader.sh` one last time before zipping so the graders see up-to-date outputs.
@@ -139,8 +147,6 @@ This runs the `examples/prep_submission_kaggle.py` module using `uv` and will pr
 head -n 10 kaggle_submission.csv
 ```
 
-
-
 Notes:
 - Ensure the submission CSV uses the exact column names and formats required by the competition. Our helper script produces `ID` and `SPAM/HAM` columns as expected.
 - If you need to create a different input path or output filename, pass `--input` and `--output` to the `uv run -m examples.prep_submission_kaggle` command.
@@ -158,7 +164,7 @@ Notes:
 
 2. **Only include one ckpt file if you trained a model.**
 
-    Do not include all of your ckpt files in your submission. Only include the best one. If you include multiple ckpt files, ***we can't guarantee*** we will check all of them and ***pick the best one***.
+    Do not include all of your ckpt files in your submission. Keep only necessary checkpoint in `examples/ckpts/`(If you don't use model ensemble methods or LoRA, only keep one checkpoint). If you include multiple ckpt files, ***we can't guarantee*** we will check all of them and ***pick the best one***.
 
 3. Don't change any code in the `autograder` folder.
 
