@@ -23,9 +23,10 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
-
 from autograder.dataset import CPEN455_2025_W1_Dataset, ENRON_LABEL_INDEX_MAP, prepare_subset
 from model import LlamaModel
+from model.prefix_llama import PrefixLlamaModel
+from model.lora import apply_lora_to_model
 from utils.weight_utils import load_model_weights
 from model.config import Config
 from model.tokenizer import Tokenizer
@@ -57,7 +58,7 @@ def get_seq_log_prob(prompts, tokenizer, model, device):
     return gathered_log_prob.sum(dim=-1)
 
 
-METHOD_SET = ["zero_shot", "naive_prompting", "full_finetune"]
+METHOD_SET = ["zero_shot", "naive_prompting", "full_finetune", "prefix_tuning", "lora"]
 
 def is_required_training(method: str) -> bool:
     assert method in METHOD_SET, f"Method {method} not recognized. Choose from {METHOD_SET}."
@@ -160,10 +161,13 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset_path", type=str, default="autograder/cpen455_released_datasets/test_subset.csv")
     parser.add_argument("--prob_output_folder", type=str, default="bayes_inverse_probs")
     parser.add_argument("--user_prompt", type=str, default="")
+    parser.add_argument("--lora_rank", type=int, default=8)
+    parser.add_argument("--lora_alpha", type=int, default=16)
     
     # Training hyperparameters
     parser.add_argument("--num_iterations", type=int, default=100)
     parser.add_argument("--learning_rate", type=float, default=1e-5)
+    parser.add_argument("--prefix_length", type=int, default=20)
     args = parser.parse_args()
 
     load_dotenv()
@@ -197,6 +201,14 @@ if __name__ == "__main__":
     # Load model
     model = LlamaModel(config)
     load_model_weights(model, checkpoint, cache_dir=model_cache_dir, device=device)
+
+    # Wrap the model for prefix tuning if needed
+    if args.method == "prefix_tuning":
+        prefix_length = 20  # You can adjust this value as needed
+        model = PrefixLlamaModel(base_model=model, prefix_length=prefix_length)
+    elif args.method == "lora":
+        apply_lora_to_model(model, r=args.lora_rank, lora_alpha=args.lora_alpha)
+
     model = model.to(device)
 
     # Set up datasets and dataloaders
@@ -222,7 +234,13 @@ if __name__ == "__main__":
         shuffle=False
         )
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
+    # If using Prefix tuning
+    if args.method == "prefix_tuning":
+        params_to_optimize = model.trainable_parameters()
+    else:
+        params_to_optimize = model.parameters()
+
+    optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate)
     
     if os.path.exists(args.prob_output_folder) == False:
         os.makedirs(args.prob_output_folder)
