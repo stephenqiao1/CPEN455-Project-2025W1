@@ -59,7 +59,14 @@ if __name__ == "__main__":
 
     # Load model
     model = LlamaModel(config)
-    load_model_weights(model, checkpoint, cache_dir=model_cache_dir, device=device)
+    # load_model_weights(model, checkpoint, cache_dir=model_cache_dir, device=device)
+    checkpoint_path = "examples/ckpts/model_best_val.pt"
+
+    print(f"Loading fine-tuned weights from {checkpoint_path}...")
+
+    state_dict = torch.load(checkpoint_path, map_location=device)
+    model.load_state_dict(state_dict, strict=False)
+
     model = model.to(device)
     
     test_dataset = CPEN455_2025_W1_Dataset(csv_path=args.test_dataset_path)

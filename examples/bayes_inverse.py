@@ -163,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--user_prompt", type=str, default="")
     parser.add_argument("--lora_rank", type=int, default=8)
     parser.add_argument("--lora_alpha", type=int, default=16)
+    parser.add_argument("--patience", type=int, default=5)
     
     # Training hyperparameters
     parser.add_argument("--num_iterations", type=int, default=100)
@@ -245,6 +246,9 @@ if __name__ == "__main__":
     if os.path.exists(args.prob_output_folder) == False:
         os.makedirs(args.prob_output_folder)
 
+    best_val_acc = 0.0
+    patience_counter = 0
+
     for iteration in tqdm(range(args.num_iterations), desc="Training"):
                     
         if (iteration + 1) % 10 == 0:
@@ -264,11 +268,33 @@ if __name__ == "__main__":
                     val_acc_logger.update(is_correct)
                     val_bpd_logger.update(bpd.item())
 
+                    current_val_acc = val_acc_logger.compute_accuracy()
+                    current_val_bpd = val_bpd_logger.compute_average()
+
                     wandb.log({
                         "val_avg_bpd": val_bpd_logger.compute_average(),
                         "val_avg_accuracy": val_acc_logger.compute_accuracy(),
                         "training_iteration": iteration,
                         })
+                    
+                    # Early stopping check
+                    print(f"\nValidation Accuracy: {current_val_acc:.4f}, Best: {best_val_acc:.4f}")
+                    if current_val_acc > best_val_acc:
+                        best_val_acc = current_val_acc
+                        patience_counter = 0
+
+                        # Save the best model checkpoint
+                        os.makedirs("examples/ckpts", exist_ok=True)
+                        save_path = os.path.join("examples/ckpts", "model_best_val.pt")
+                        torch.save(model.state_dict(), save_path)
+                        print(f">> New best model saved to {save_path}")
+                    else:
+                        patience_counter += 1
+                        print(f">> No improvement. Patient: {patience_counter}/{args.patience}")
+                    
+                    if patience_counter >= args.patience:
+                        print("Early stopping triggered.")
+                        break
                     
         if not is_required_training(args.method):
             break
@@ -288,6 +314,14 @@ if __name__ == "__main__":
             "training_batch_acc": is_correct.float().mean().item(),
             "training_iteration": iteration,
             })
+
+    # Save checkpoint after training
+    print("Training finished. Saving checkpoint...")
+
+    os.makedirs("examples/ckpts", exist_ok=True)
+    save_path = os.path.join("examples/ckpts", "model_final.pt")
+    torch.save(model.state_dict(), save_path)
+    print(f"Model saved to {save_path}")
 
     # After training, save probabilities on test set
     train_n_val_dataloader = DataLoader(
