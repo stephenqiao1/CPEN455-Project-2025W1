@@ -5,4 +5,10 @@ uv run -m examples.bayes_inverse \
 --batch_size 8 \
 --num_iterations 150 \
 --learning_rate 1e-5 \
---dataset_path autograder/cpen455_released_datasets/augmented_train_val_subset.csv
+--save_checkpoint \
+--checkpoint_path examples/ckpts/model_full_finetune.pt \
+--dataset_path autograder/cpen455_released_datasets/augmented_train_val_subset.csv \
+--early_stopping \
+--patience 5 \
+--min_delta 0.001 \
+--eval_interval 10

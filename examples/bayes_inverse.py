@@ -149,6 +149,99 @@ def save_probs(args, model, tokenizer, dataloader, device, name = "test"):
                     handle.write("data_index,prob_ham,prob_spam\n")
                 handle.writelines(f"{idx},{ham},{spam}\n" for idx, ham, spam in rows)
 
+
+def save_checkpoint(model, checkpoint_path, method):
+    """
+    Save model checkpoint after training.
+    
+    Args:
+        model: The trained model (could be LlamaModel, PrefixLlamaModel, or LoRA-wrapped model)
+        checkpoint_path: Path to save the checkpoint
+        method: Training method used (full_finetune, prefix_tuning, lora)
+    """
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+    
+    if method == "prefix_tuning":
+        # For prefix tuning, save the base model's state dict
+        # The prefix parameters are part of the PrefixLlamaModel
+        state_dict = model.model.state_dict()
+        print(f"Saving base model state dict for prefix tuning to: {checkpoint_path}")
+    elif method == "lora":
+        # For LoRA, save the entire model state dict (includes LoRA parameters)
+        state_dict = model.state_dict()
+        print(f"Saving LoRA model state dict to: {checkpoint_path}")
+    else:
+        # For full finetune, save the entire model state dict
+        state_dict = model.state_dict()
+        print(f"Saving full model state dict to: {checkpoint_path}")
+    
+    torch.save(state_dict, checkpoint_path)
+    print(f"Checkpoint saved successfully to: {checkpoint_path}")
+
+
+class EarlyStopping:
+    """
+    Early stopping to stop training when validation performance doesn't improve.
+    
+    Args:
+        patience: Number of evaluations to wait before stopping after no improvement
+        min_delta: Minimum change in monitored metric to qualify as an improvement
+        mode: 'max' for metrics where higher is better (e.g., accuracy),
+              'min' for metrics where lower is better (e.g., loss)
+        verbose: Whether to print messages
+    """
+    def __init__(self, patience=5, min_delta=0.0, mode='max', verbose=True):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.mode = mode
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.best_iteration = 0
+        
+    def __call__(self, score, iteration):
+        """
+        Check if training should stop.
+        
+        Args:
+            score: Current validation metric value
+            iteration: Current training iteration
+            
+        Returns:
+            bool: True if this is a new best score, False otherwise
+        """
+        if self.best_score is None:
+            self.best_score = score
+            self.best_iteration = iteration
+            return True
+        
+        if self.mode == 'max':
+            improved = score > self.best_score + self.min_delta
+        else:  # mode == 'min'
+            improved = score < self.best_score - self.min_delta
+            
+        if improved:
+            if self.verbose:
+                print(f"Validation metric improved from {self.best_score:.4f} to {score:.4f}")
+            self.best_score = score
+            self.best_iteration = iteration
+            self.counter = 0
+            return True
+        else:
+            self.counter += 1
+            if self.verbose:
+                print(f"No improvement for {self.counter}/{self.patience} evaluations. "
+                      f"Best: {self.best_score:.4f} at iteration {self.best_iteration}")
+            if self.counter >= self.patience:
+                self.early_stop = True
+                if self.verbose:
+                    print(f"Early stopping triggered! Best score: {self.best_score:.4f} "
+                          f"at iteration {self.best_iteration}")
+            return False
+
+
 if __name__ == "__main__":
     # random seed for reproducibility
     torch.manual_seed(0)
@@ -168,6 +261,17 @@ if __name__ == "__main__":
     parser.add_argument("--num_iterations", type=int, default=100)
     parser.add_argument("--learning_rate", type=float, default=1e-5)
     parser.add_argument("--prefix_length", type=int, default=20)
+    
+    # Checkpoint saving arguments
+    parser.add_argument("--save_checkpoint", action="store_true", help="Save model checkpoint after training")
+    parser.add_argument("--checkpoint_path", type=str, default="examples/ckpts/model_finetuned.pt", help="Path to save the checkpoint")
+    
+    # Early stopping arguments
+    parser.add_argument("--early_stopping", action="store_true", help="Enable early stopping")
+    parser.add_argument("--patience", type=int, default=5, help="Number of evaluations to wait before early stopping")
+    parser.add_argument("--min_delta", type=float, default=0.001, help="Minimum improvement to reset patience counter")
+    parser.add_argument("--eval_interval", type=int, default=10, help="Evaluate every N iterations")
+    
     args = parser.parse_args()
 
     load_dotenv()
@@ -204,7 +308,7 @@ if __name__ == "__main__":
 
     # Wrap the model for prefix tuning if needed
     if args.method == "prefix_tuning":
-        prefix_length = 20  # You can adjust this value as needed
+        prefix_length = args.prefix_length
         model = PrefixLlamaModel(base_model=model, prefix_length=prefix_length)
     elif args.method == "lora":
         apply_lora_to_model(model, r=args.lora_rank, lora_alpha=args.lora_alpha)
@@ -245,14 +349,31 @@ if __name__ == "__main__":
     if os.path.exists(args.prob_output_folder) == False:
         os.makedirs(args.prob_output_folder)
 
+    # Initialize early stopping if enabled
+    early_stopper = None
+    if args.early_stopping and is_required_training(args.method):
+        early_stopper = EarlyStopping(
+            patience=args.patience,
+            min_delta=args.min_delta,
+            mode='max',  # We're maximizing accuracy
+            verbose=True
+        )
+        print(f"Early stopping enabled with patience={args.patience}, min_delta={args.min_delta}")
+
+    # Track best validation accuracy for saving best checkpoint
+    best_val_acc = 0.0
+    final_iteration = 0
+
     for iteration in tqdm(range(args.num_iterations), desc="Training"):
-                    
-        if (iteration + 1) % 10 == 0:
+        final_iteration = iteration
+        
+        # Evaluation phase
+        if (iteration + 1) % args.eval_interval == 0:
             val_acc_logger = avg_acc_logger()
             val_bpd_logger = avg_logger()
             
             with torch.no_grad():
-                for batch in tqdm(val_dataloader, desc="Evaluating on validation set during training"):
+                for batch in tqdm(val_dataloader, desc="Evaluating on validation set during training", leave=False):
                     
                     bpd, is_correct, (probs, labels_pred) = train_or_test(
                         args = args, 
@@ -264,11 +385,39 @@ if __name__ == "__main__":
                     val_acc_logger.update(is_correct)
                     val_bpd_logger.update(bpd.item())
 
-                    wandb.log({
-                        "val_avg_bpd": val_bpd_logger.compute_average(),
-                        "val_avg_accuracy": val_acc_logger.compute_accuracy(),
-                        "training_iteration": iteration,
-                        })
+            current_val_acc = val_acc_logger.compute_accuracy()
+            current_val_bpd = val_bpd_logger.compute_average()
+            
+            wandb.log({
+                "val_avg_bpd": current_val_bpd,
+                "val_avg_accuracy": current_val_acc,
+                "training_iteration": iteration,
+            })
+            
+            print(f"\nIteration {iteration + 1}: Val Accuracy = {current_val_acc:.4f}, Val BPD = {current_val_bpd:.4f}")
+            
+            # Check early stopping
+            if early_stopper is not None:
+                is_best = early_stopper(current_val_acc, iteration)
+                
+                # Save best checkpoint
+                if is_best and args.save_checkpoint:
+                    best_val_acc = current_val_acc
+                    best_checkpoint_path = args.checkpoint_path.replace(".pt", "_best_val.pt")
+                    save_checkpoint(model, best_checkpoint_path, args.method)
+                
+                # Check if we should stop
+                if early_stopper.early_stop:
+                    print(f"\nEarly stopping at iteration {iteration + 1}!")
+                    print(f"Best validation accuracy: {early_stopper.best_score:.4f} at iteration {early_stopper.best_iteration + 1}")
+                    break
+            else:
+                # Without early stopping, still save best checkpoint
+                if args.save_checkpoint and current_val_acc > best_val_acc:
+                    best_val_acc = current_val_acc
+                    best_checkpoint_path = args.checkpoint_path.replace(".pt", "_best_val.pt")
+                    save_checkpoint(model, best_checkpoint_path, args.method)
+                    print(f"New best validation accuracy: {best_val_acc:.4f}")
                     
         if not is_required_training(args.method):
             break
@@ -288,6 +437,23 @@ if __name__ == "__main__":
             "training_batch_acc": is_correct.float().mean().item(),
             "training_iteration": iteration,
             })
+
+    # Print training summary
+    if is_required_training(args.method):
+        print(f"\n{'='*50}")
+        print("Training Summary:")
+        print(f"{'='*50}")
+        print(f"Total iterations: {final_iteration + 1}")
+        print(f"Best validation accuracy: {best_val_acc:.4f}")
+        if early_stopper is not None and early_stopper.early_stop:
+            print(f"Training stopped early at iteration {final_iteration + 1}")
+            print(f"Best model was at iteration {early_stopper.best_iteration + 1}")
+        print(f"{'='*50}\n")
+
+    # Save final checkpoint after training if requested
+    if args.save_checkpoint and is_required_training(args.method):
+        save_checkpoint(model, args.checkpoint_path, args.method)
+        print(f"Final checkpoint saved to: {args.checkpoint_path}")
 
     # After training, save probabilities on test set
     train_n_val_dataloader = DataLoader(
