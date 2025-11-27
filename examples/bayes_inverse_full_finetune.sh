@@ -10,5 +10,5 @@ uv run -m examples.bayes_inverse \
 --dataset_path autograder/cpen455_released_datasets/augmented_train_val_subset.csv \
 --early_stopping \
 --patience 5 \
---min_delta 0.001 \
+--min_delta 0.0 \
 --eval_interval 10
