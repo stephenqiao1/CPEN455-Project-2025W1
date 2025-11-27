@@ -8,4 +8,4 @@ SmolLM2-135M-Instruct/
 wandb/
 released_dataset/
 bayes_inverse_probs*
-autograder/
+autograder/examples/ckpts/*.pt
