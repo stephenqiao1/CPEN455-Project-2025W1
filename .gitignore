@@ -11,3 +11,10 @@ bayes_inverse_probs*
 autograder/examples/ckpts/*.pt
 examples/ckpts/
 .cursor/
+# Large model files
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+.DS_Store
