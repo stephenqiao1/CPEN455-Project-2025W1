@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-12-06T18:43:47.463046",
+  "config": {
+    "num_iterations": 300,
+    "max_seq_len": 256,
+    "method": "full_finetune"
+  },
+  "results": [
+    {
+      "batch_size": 4,
+      "weight_decay": 0.0005,
+      "learning_rate": 5e-06,
+      "validation_accuracy": 0.75,
+      "elapsed_time": 101.00485396385193,
+      "checkpoint_path": "examples/ckpts/model_full_finetune_bs4_wd0.0005.pt",
+      "status": "success",
+      "stdout": ", 10.52it/s]\nsaving probabilities:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 246/250 [00:22<00:00, 10.73it/s]\nsaving probabilities:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 248/250 [00:22<00:00, 11.08it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:22<00:00, 11.26it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:22<00:00, 11.05it/s]\n\u001b[1;34mwandb\u001b[0m: \n\u001b[1;34mwandb\u001b[0m: \ud83d\ude80 View run \u001b[33mbayes-inverse-full_finetune_msl256_ni300_bs4\u001b[0m at: \u001b[34m\u001b[0m\n\u001b[1;34mwandb\u001b[0m: Find logs at: \u001b[1;35mwandb/run-20251206_183911-naw3lb0f/logs\u001b[0m\n"
+    },
+    {
+      "batch_size": 4,
+      "weight_decay": 0.0007,
+      "learning_rate": 5e-06,
+      "validation_accuracy": 0.75,
+      "elapsed_time": 89.08774399757385,
+      "checkpoint_path": "examples/ckpts/model_full_finetune_bs4_wd0.0007.pt",
+      "status": "success",
+      "stdout": ", 11.56it/s]\nsaving probabilities:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 246/250 [00:22<00:00, 11.74it/s]\nsaving probabilities:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 248/250 [00:22<00:00, 11.97it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:22<00:00, 12.11it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:22<00:00, 11.20it/s]\n\u001b[1;34mwandb\u001b[0m: \n\u001b[1;34mwandb\u001b[0m: \ud83d\ude80 View run \u001b[33mbayes-inverse-full_finetune_msl256_ni300_bs4\u001b[0m at: \u001b[34m\u001b[0m\n\u001b[1;34mwandb\u001b[0m: Find logs at: \u001b[1;35mwandb/run-20251206_184052-q9bgtecl/logs\u001b[0m\n"
+    },
+    {
+      "batch_size": 4,
+      "weight_decay": 0.0015,
+      "learning_rate": 5e-06,
+      "validation_accuracy": 0.5,
+      "elapsed_time": 88.20478701591492,
+      "checkpoint_path": "examples/ckpts/model_full_finetune_bs4_wd0.0015.pt",
+      "status": "success",
+      "stdout": ", 10.67it/s]\nsaving probabilities:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 246/250 [00:23<00:00, 10.81it/s]\nsaving probabilities:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 248/250 [00:23<00:00, 11.04it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:23<00:00, 11.16it/s]\nsaving probabilities: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 250/250 [00:23<00:00, 10.49it/s]\n\u001b[1;34mwandb\u001b[0m: \n\u001b[1;34mwandb\u001b[0m: \ud83d\ude80 View run \u001b[33mbayes-inverse-full_finetune_msl256_ni300_bs4\u001b[0m at: \u001b[34m\u001b[0m\n\u001b[1;34mwandb\u001b[0m: Find logs at: \u001b[1;35mwandb/run-20251206_184221-1qbmv84d/logs\u001b[0m\n"
+    }
+  ]
+}

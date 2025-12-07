@@ -60,7 +60,8 @@ if __name__ == "__main__":
     # Load model
     model = LlamaModel(config)
     # load_model_weights(model, checkpoint, cache_dir=model_cache_dir, device=device)
-    checkpoint_path = "examples/ckpts/model_full_finetune_best_val.pt"
+    # checkpoint_path = "examples/ckpts/model_full_finetune_best_val.pt"
+    checkpoint_path = "examples/ckpts/model_full_finetune_bs4_wd0.0015.pt"
 
     print(f"Loading fine-tuned weights from {checkpoint_path}...")
 

@@ -10,3 +10,4 @@ released_dataset/
 bayes_inverse_probs*
 autograder/examples/ckpts/*.pt
 examples/ckpts/
+.cursor/
