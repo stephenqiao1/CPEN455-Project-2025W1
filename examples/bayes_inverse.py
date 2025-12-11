@@ -13,6 +13,7 @@ Usage:
 
 import os
 import pdb
+import json
 import wandb
 from dotenv import load_dotenv
 from einops import rearrange
@@ -20,6 +21,7 @@ from tqdm import tqdm
 import argparse
 import random
 import numpy as np
+from datetime import datetime
 
 import torch
 from torch.utils.data import DataLoader
@@ -165,9 +167,9 @@ def save_probs(args, model, tokenizer, dataloader, device, name = "test"):
 
 if __name__ == "__main__":
     # random seed for reproducibility
-    torch.manual_seed(0)
-    # random.seed(0)       # For experiments involving random sampling
-    # np.random.seed(0)   
+    torch.manual_seed(25)
+    random.seed(25)       # For experiments involving random sampling
+    np.random.seed(25)   
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", type=str, default="zero-shot", choices=METHOD_SET)
@@ -182,6 +184,8 @@ if __name__ == "__main__":
     # Training hyperparameters
     parser.add_argument("--num_iterations", type=int, default=100)
     parser.add_argument("--learning_rate", type=float, default=1e-5)
+    parser.add_argument("--val_frequency", type=int, default=10,
+                        help="Frequency of validation checks during training (default: 10, i.e., every 10 iterations)")
     
     # Early stopping
     parser.add_argument("--early_stopping_patience", type=int, default=None,
@@ -195,6 +199,10 @@ if __name__ == "__main__":
     
     parser.add_argument("--checkpoint_dir", type=str, default="examples/ckpts",
                         help="Directory to save model checkpoints")
+    
+    # Dataset usage
+    parser.add_argument("--use_full_dataset", action="store_true",
+                        help="Use entire dataset for training (no train/val split). Disables validation and early stopping.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -232,7 +240,17 @@ if __name__ == "__main__":
 
     # Set up datasets and dataloaders
     train_n_val_dataset = CPEN455_2025_W1_Dataset(csv_path=args.dataset_path)
-    training_dataset, val_dataset = prepare_subset(train_n_val_dataset, int(0.8 * len(train_n_val_dataset)), ratio_spam=0.5, return_remaining=True)
+    
+    if args.use_full_dataset:
+        # Use entire dataset for training (no validation split)
+        print(f"Using full dataset for training ({len(train_n_val_dataset)} samples)")
+        training_dataset = train_n_val_dataset
+        val_dataset = None
+    else:
+        # Split into training (80%) and validation (20%)
+        training_dataset, val_dataset = prepare_subset(train_n_val_dataset, int(0.8 * len(train_n_val_dataset)), ratio_spam=0.5, return_remaining=True)
+        print(f"Training dataset: {len(training_dataset)} samples, Validation dataset: {len(val_dataset)} samples")
+    
     test_dataset = CPEN455_2025_W1_Dataset(csv_path=args.test_dataset_path)
 
     training_dataloader = DataLoader(
@@ -245,7 +263,7 @@ if __name__ == "__main__":
         val_dataset, 
         batch_size=args.batch_size, 
         shuffle=False
-        )
+        ) if val_dataset is not None else None
     
     test_dataloader = DataLoader(
         test_dataset, 
@@ -271,15 +289,24 @@ if __name__ == "__main__":
         os.makedirs(args.checkpoint_dir)
     
     # Early stopping setup
-    early_stopping_enabled = (args.early_stopping_patience is not None and 
+    # Disable early stopping if using full dataset (no validation set available)
+    early_stopping_enabled = (not args.use_full_dataset and
+                              args.early_stopping_patience is not None and 
                               args.early_stopping_patience > 0 and 
                               is_required_training(args.method))
+    
+    if args.use_full_dataset:
+        print("Validation and early stopping disabled (using full dataset)")
     
     best_val_accuracy = float('-inf')
     best_val_bpd = float('inf')
     patience_counter = 0
     best_model_state = None
     best_checkpoint_path = None
+    best_iteration = None  # Track which iteration had the best model
+    early_stopping_triggered = False  # Track if early stopping was triggered
+    early_stopping_iteration = None  # Track when early stopping was triggered
+    iterations_completed = 0  # Track total iterations completed
     
     if early_stopping_enabled:
         print(f"Early stopping enabled: patience={args.early_stopping_patience}, min_delta={args.early_stopping_min_delta}")
@@ -287,7 +314,7 @@ if __name__ == "__main__":
 
     for iteration in tqdm(range(args.num_iterations), desc="Training"):
                     
-        if (iteration + 1) % 10 == 0:
+        if (iteration + 1) % args.val_frequency == 0 and not args.use_full_dataset:
             val_acc_logger = avg_acc_logger()
             val_bpd_logger = avg_logger()
             
@@ -335,6 +362,7 @@ if __name__ == "__main__":
                     
                     patience_counter = 0
                     best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                    best_iteration = iteration + 1  # Track the iteration where best model was found
                     
                     # Save best model checkpoint
                     if best_checkpoint_path is None:
@@ -354,11 +382,24 @@ if __name__ == "__main__":
                     
                     # Check if we should stop early
                     if patience_counter >= args.early_stopping_patience:
-                        print(f"\nEarly stopping triggered after {iteration + 1} iterations!")
+                        early_stopping_triggered = True
+                        early_stopping_iteration = iteration + 1
+                        best_iteration_at_stop = best_iteration if best_iteration is not None else (iteration + 1 - patience_counter * args.val_frequency)
+                        
+                        print(f"\nEarly stopping triggered after {early_stopping_iteration} iterations!")
                         print(f"Best validation accuracy: {best_val_accuracy:.4f}")
                         print(f"Best validation BPD: {best_val_bpd:.4f}")
-                        print(f"Best model was at iteration {iteration + 1 - patience_counter * 10}")
+                        print(f"Best model was at iteration {best_iteration_at_stop}")
                         print(f"Restoring best model weights...")
+                        
+                        # Log to wandb
+                        wandb.log({
+                            "early_stopping_triggered": True,
+                            "early_stopping_iteration": early_stopping_iteration,
+                            "best_iteration": best_iteration_at_stop,
+                            "best_val_accuracy": best_val_accuracy,
+                            "best_val_bpd": best_val_bpd,
+                        })
                         
                         # Restore best model
                         model.load_state_dict(best_model_state)
@@ -383,7 +424,15 @@ if __name__ == "__main__":
             "training_batch_acc": is_correct.float().mean().item(),
             "training_iteration": iteration,
             })
+        
+        iterations_completed = iteration + 1
 
+    # Save final checkpoint when using full dataset
+    if args.use_full_dataset:
+        final_checkpoint_path = os.path.join(args.checkpoint_dir, f"model_{args.method}_full_dataset_final.pt")
+        torch.save(model.state_dict(), final_checkpoint_path)
+        print(f"\nTraining completed. Final model saved to {final_checkpoint_path}")
+    
     # Restore best model if early stopping was enabled and we didn't already restore it
     if early_stopping_enabled and best_model_state is not None:
         # Only restore if we didn't break early (i.e., we completed all iterations)
@@ -398,6 +447,35 @@ if __name__ == "__main__":
             print(f"\nTraining stopped early. Best model restored.")
             print(f"  Best validation accuracy: {best_val_accuracy:.4f}")
             print(f"  Best validation BPD: {best_val_bpd:.4f}")
+    
+    # Save early stopping information even if training completed without triggering
+    if early_stopping_enabled:
+        early_stopping_info = {
+            "early_stopping_enabled": True,
+            "early_stopping_triggered": early_stopping_triggered,
+            "early_stopping_iteration": early_stopping_iteration,
+            "best_iteration": best_iteration,
+            "best_val_accuracy": float(best_val_accuracy) if best_val_accuracy > float('-inf') else None,
+            "best_val_bpd": float(best_val_bpd) if best_val_bpd < float('inf') else None,
+            "patience": args.early_stopping_patience,
+            "min_delta": args.early_stopping_min_delta,
+            "total_iterations": args.num_iterations,
+            "iterations_completed": iterations_completed,
+            "best_checkpoint_path": best_checkpoint_path,
+            "timestamp": datetime.now().isoformat(),
+        }
+        
+        early_stopping_file = os.path.join(args.checkpoint_dir, f"early_stopping_{args.method}.json")
+        with open(early_stopping_file, 'w') as f:
+            json.dump(early_stopping_info, f, indent=2)
+        print(f"Early stopping information saved to {early_stopping_file}")
+        
+        # Log to wandb
+        wandb.log({
+            "early_stopping_info": early_stopping_info,
+            "best_iteration": best_iteration,
+            "early_stopping_triggered": early_stopping_triggered,
+        })
 
     # Save final model checkpoint
     if is_required_training(args.method):
